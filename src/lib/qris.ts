@@ -377,3 +377,32 @@ export function compareWithReference(referenceRaw: string, scannedRaw: string): 
   const nameMatches = !!ref?.merchantName && ref.merchantName === scan?.merchantName;
   return { identical, nameMatches, diffs };
 }
+
+export interface PayloadDiffRow {
+  field: string;
+  a?: string;
+  b?: string;
+  differ: boolean;
+}
+
+/** Field-by-field diff of two payloads, for the Bandingkan dua QR view. */
+export function diffPayloads(aRaw: string, bRaw: string): PayloadDiffRow[] {
+  let a: QrisData | undefined;
+  let b: QrisData | undefined;
+  try { a = parseQris(aRaw); } catch { /* unparsable */ }
+  try { b = parseQris(bRaw); } catch { /* unparsable */ }
+  const crcText = (d?: QrisData) => (d?.crcValue ? (d.crcValid ? d.crcValue + ' (cocok)' : d.crcValue + ' (TIDAK cocok)') : undefined);
+  const raw: Array<[string, string | undefined, string | undefined]> = [
+    ['Nama merchant', a?.merchantName, b?.merchantName],
+    ['Kota merchant', a?.merchantCity, b?.merchantCity],
+    ['PAN merchant', a?.qrisAccount?.merchantPan, b?.qrisAccount?.merchantPan],
+    ['ID merchant', a?.qrisAccount?.merchantId, b?.qrisAccount?.merchantId],
+    ['Penerbit QRIS', a?.qrisAccount?.globalId, b?.qrisAccount?.globalId],
+    ['Jenis QR', a ? (a.isDynamic ? 'Dinamis' : 'Statis') : undefined, b ? (b.isDynamic ? 'Dinamis' : 'Statis') : undefined],
+    ['Nominal terkunci', a?.amount ? 'Rp' + formatIdr(a.amount) : undefined, b?.amount ? 'Rp' + formatIdr(b.amount) : undefined],
+    ['Kategori usaha (MCC)', a?.merchantCategoryCode, b?.merchantCategoryCode],
+    ['Checksum CRC', crcText(a), crcText(b)],
+    ['Payload mentah', aRaw.trim() ? aRaw.trim().slice(0, 60) + '…' : undefined, bRaw.trim() ? bRaw.trim().slice(0, 60) + '…' : undefined],
+  ];
+  return raw.map(([field, av, bv]) => ({ field, a: av, b: bv, differ: (av ?? '') !== (bv ?? '') }));
+}

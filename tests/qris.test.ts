@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseQris, crc16Ccitt, assessPayload, compareWithReference } from '../src/lib/qris';
+import { parseQris, crc16Ccitt, assessPayload, compareWithReference, diffPayloads } from '../src/lib/qris';
 
 // Vectors generated and CRC-signed with an independent Python implementation
 // of CRC-16/CCITT-FALSE — cross-checks the TypeScript implementation.
@@ -111,5 +111,21 @@ describe('compareWithReference', () => {
     expect(c.identical).toBe(false);
     expect(c.nameMatches).toBe(false);
     expect(c.diffs.length).toBeGreaterThan(0);
+  });
+});
+
+describe('diffPayloads', () => {
+  it('marks every row equal for identical payloads', () => {
+    const rows = diffPayloads(STATIC_QRIS, STATIC_QRIS);
+    expect(rows.every((r) => !r.differ)).toBe(true);
+    expect(rows.find((r) => r.field === 'Nama merchant')?.a).toBe('TOKO BERKAH JAYA');
+  });
+  it('highlights only the swapped merchant id row', () => {
+    const swapped = STATIC_QRIS.replace('ML12345678', 'ML87654321');
+    const rows = diffPayloads(STATIC_QRIS, swapped);
+    const differing = rows.filter((r) => r.differ).map((r) => r.field);
+    expect(differing).toContain('ID merchant');
+    expect(differing).not.toContain('Nama merchant');
+    expect(differing).not.toContain('PAN merchant');
   });
 });
