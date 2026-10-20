@@ -1,0 +1,459 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout>
+  <div class="relative overflow-x-clip">
+    <!-- Aurora background on dark, Antigravity-style soft gradient blobs -->
+    <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px] overflow-hidden">
+      <div class="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#4285f4]/25 blur-[110px]"></div>
+      <div class="absolute -right-24 top-10 h-80 w-80 rounded-full bg-[#c58af9]/20 blur-[110px]"></div>
+      <div class="absolute left-1/3 top-64 h-72 w-72 rounded-full bg-[#fdd663]/10 blur-[120px]"></div>
+    </div>
+
+    <div class="mx-auto lg:flex lg:max-w-[1440px]">
+      <!-- ============ SIDEBAR: control console ============ -->
+      <aside class="border-b border-line bg-panel/85 backdrop-blur lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[360px] lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r">
+        <div class="flex items-center justify-between px-5 pt-5">
+          <p class="font-display text-xl font-medium tracking-tight text-txt">CekQRIS<span class="text-gradient">Aman</span></p>
+          <span class="rounded-full bg-card px-3 py-1.5 text-[11px] font-medium text-soft">100% lokal</span>
+        </div>
+
+        <div class="px-5 pb-5 pt-5">
+          <p class="font-display text-sm font-medium uppercase tracking-wider text-mute">Periksa QRIS</p>
+
+          <button id="btn-camera" type="button" class="mt-3 w-full rounded-full bg-txt px-5 py-3.5 font-medium text-[#121317] transition hover:bg-white">
+            Scan dengan kamera
+          </button>
+          <label for="file-input" class="mt-2.5 block w-full cursor-pointer rounded-full border border-line px-5 py-3.5 text-center font-medium text-txt transition hover:bg-card">
+            Upload foto QR
+          </label>
+          <input id="file-input" type="file" accept="image/*" class="hidden" />
+
+          <div id="camera-wrap" class="mt-3 hidden">
+            <video id="camera" playsinline muted autoplay class="aspect-[4/3] w-full rounded-[24px] bg-black object-cover"></video>
+            <button id="btn-stop-camera" type="button" class="mt-2.5 w-full rounded-full border border-badtitle/40 bg-badbg px-5 py-3 font-medium text-badtitle">Berhenti memindai</button>
+          </div>
+
+          <div id="dropzone" class="mt-3 rounded-[24px] border-2 border-dashed border-[#3c4043] bg-card px-4 py-5 text-center text-sm text-mute transition">
+            Tarik foto QR ke sini, atau tempel (paste) gambar dari clipboard.
+          </div>
+
+          <details class="mt-4">
+            <summary class="cursor-pointer text-sm font-medium text-soft">Tempel teks isi QR</summary>
+            <div class="mt-2.5">
+              <textarea id="payload-input" rows="3" class="w-full rounded-[20px] border border-line bg-input p-3.5 font-mono text-xs text-txt placeholder:text-mute" placeholder="000201010211..."></textarea>
+              <div class="mt-2.5 flex gap-2">
+                <button id="btn-check-payload" type="button" class="flex-1 rounded-full bg-gblue px-4 py-2.5 font-medium text-white transition hover:bg-[#1765cc]">Periksa</button>
+                <button id="btn-demo" type="button" class="rounded-full border border-line px-4 py-2.5 font-medium text-soft transition hover:bg-card">Contoh QRIS</button>
+              </div>
+            </div>
+          </details>
+
+          <p id="status" class="mt-4 hidden rounded-[20px] px-4 py-3 text-sm" role="status"></p>
+        </div>
+
+        <div class="border-t border-line px-5 py-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+          <div class="flex items-center justify-between">
+            <p class="font-display text-sm font-medium uppercase tracking-wider text-mute">Riwayat di perangkat ini</p>
+            <button id="btn-clear-history" type="button" class="hidden text-xs font-medium text-gsoft hover:underline">Hapus semua</button>
+          </div>
+          <p id="history-empty" class="mt-3 text-sm leading-relaxed text-mute">Belum ada pemeriksaan. Hasil scan akan tersimpan di sini, hanya di browser Anda.</p>
+          <ul id="history-list" class="mt-2 space-y-1.5"></ul>
+        </div>
+      </aside>
+
+      <!-- ============ MAIN: result canvas ============ -->
+      <main class="min-w-0 flex-1 px-4 py-8 sm:px-8 lg:py-12">
+        <div class="mx-auto max-w-3xl">
+          <section>
+            <span class="inline-block rounded-full border border-line bg-card px-4 py-1.5 text-xs font-medium text-soft">Gratis &middot; Tanpa daftar &middot; Tanpa server</span>
+            <h1 class="font-display mt-5 text-4xl font-medium leading-[1.1] tracking-tight text-txt sm:text-5xl">
+              Jangan bayar sebelum tahu <span class="text-gradient">QRIS ini milik siapa</span>
+            </h1>
+            <p class="mt-4 max-w-xl text-base leading-relaxed text-soft">
+              Stiker QRIS palsu ditempel di atas yang asli sedang marak. Baca isi kode itu sendiri —
+              nama penerima, nominal yang terkunci, dan checksum keasliannya — dari panel di samping.
+            </p>
+          </section>
+
+          <section id="empty-state" class="mt-10 rounded-[36px] border-2 border-dashed border-line bg-card/60 px-6 py-14 text-center">
+            <div aria-hidden="true" class="mx-auto grid w-fit grid-cols-3 gap-1.5 opacity-90">
+              <span class="h-5 w-5 rounded-[5px] bg-txt"></span><span class="h-5 w-5 rounded-[5px] bg-card"></span><span class="h-5 w-5 rounded-[5px] bg-txt"></span>
+              <span class="h-5 w-5 rounded-[5px] bg-card"></span><span class="h-5 w-5 rounded-[5px] bg-gbright"></span><span class="h-5 w-5 rounded-[5px] bg-card"></span>
+              <span class="h-5 w-5 rounded-[5px] bg-txt"></span><span class="h-5 w-5 rounded-[5px] bg-card"></span><span class="h-5 w-5 rounded-[5px] bg-txt"></span>
+            </div>
+            <p class="font-display mt-6 text-xl font-medium text-txt">Belum ada QR yang diperiksa</p>
+            <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-soft">
+              Scan stiker QRIS di meja kasir, upload fotonya, atau tempel teks isi QR.
+              Hasil pemeriksaan lengkap akan tampil di area ini.
+            </p>
+          </section>
+
+          <section id="result" class="mt-10 hidden" aria-label="Hasil pemeriksaan">
+            <div id="verdict-banner" class="rounded-[36px] p-6 sm:p-8">
+              <p id="verdict-title" class="font-display text-3xl font-medium tracking-tight"></p>
+              <p id="verdict-desc" class="mt-2 text-sm leading-relaxed"></p>
+              <p class="mt-4 text-xs opacity-80">Skor risiko struktural: <span id="verdict-score" class="font-bold"></span>/100. Skor ini menilai isi kode QR, bukan reputasi penjual.</p>
+            </div>
+
+            <div id="merchant-card" class="mt-4 rounded-[36px] border border-line bg-card p-6 sm:p-8">
+              <p class="text-xs font-medium uppercase tracking-wider text-mute">Nama penerima di dalam QR</p>
+              <p id="m-name" class="font-display mt-2 text-3xl font-medium leading-snug tracking-tight text-txt"></p>
+              <dl id="m-rows" class="mt-5 divide-y divide-line text-sm"></dl>
+            </div>
+
+            <div class="mt-4 rounded-[36px] border border-line bg-card p-6 sm:p-8">
+              <p class="font-display text-lg font-medium text-txt">Sinyal pemeriksaan</p>
+              <ul id="signals" class="mt-4 space-y-4"></ul>
+            </div>
+
+            <details class="mt-4 rounded-[36px] border border-line bg-card p-6 sm:p-8">
+              <summary class="font-display cursor-pointer text-lg font-medium text-txt">Rincian teknis payload</summary>
+              <div class="mt-4 overflow-x-auto">
+                <table class="w-full text-left font-mono text-xs">
+                  <thead><tr class="text-mute"><th class="py-1 pr-3">Tag</th><th class="py-1 pr-3">Arti</th><th class="py-1">Nilai</th></tr></thead>
+                  <tbody id="fields-table"></tbody>
+                </table>
+              </div>
+              <p class="mt-5 text-xs text-mute">Payload mentah</p>
+              <pre id="raw-payload" class="mt-1.5 overflow-x-auto whitespace-pre-wrap break-all rounded-[16px] bg-input p-4 font-mono text-xs text-soft"></pre>
+            </details>
+          </section>
+
+          <section class="mt-12 grid gap-4 sm:grid-cols-3">
+            <div class="rounded-[24px] bg-card p-6">
+              <span class="flex h-9 w-9 items-center justify-center rounded-full bg-stepbg font-display font-medium text-gsoft">1</span>
+              <p class="font-display mt-4 font-medium text-txt">Scan atau upload</p>
+              <p class="mt-1 text-sm leading-relaxed text-soft">Arahkan kamera ke stiker QRIS, atau upload foto dan tangkapan layarnya.</p>
+            </div>
+            <div class="rounded-[24px] bg-card p-6">
+              <span class="flex h-9 w-9 items-center justify-center rounded-full bg-stepbg font-display font-medium text-gsoft">2</span>
+              <p class="font-display mt-4 font-medium text-txt">Baca nama aslinya</p>
+              <p class="mt-1 text-sm leading-relaxed text-soft">Nama penerima dibaca dari dalam kode, bukan dari logo atau tulisan pada stiker.</p>
+            </div>
+            <div class="rounded-[24px] bg-card p-6">
+              <span class="flex h-9 w-9 items-center justify-center rounded-full bg-stepbg font-display font-medium text-gsoft">3</span>
+              <p class="font-display mt-4 font-medium text-txt">Cocokkan, lalu bayar</p>
+              <p class="mt-1 text-sm leading-relaxed text-soft">Samakan nama dan nominal dengan yang muncul di aplikasi pembayaran Anda. Beda nama, batalkan.</p>
+            </div>
+          </section>
+
+          <section class="mt-6 rounded-[36px] bg-paper p-7 text-paperink sm:p-10">
+            <p class="font-display text-2xl font-medium tracking-tight">Foto Anda tidak pernah meninggalkan ponsel</p>
+            <p class="mt-3 text-sm leading-relaxed text-papersoft">
+              Semua pemrosesan — membaca QR, membongkar payload, memeriksa checksum — terjadi di browser Anda.
+              Tidak ada server yang menerima foto, tidak ada pelacakan, tidak ada data yang disimpan.
+              Riwayat pemeriksaan pun hanya tersimpan di perangkat ini dan bisa dihapus kapan saja.
+              Setelah kunjungan pertama, alat ini bahkan tetap bekerja tanpa internet.
+            </p>
+            <p class="mt-5 border-t border-[#dadce0] pt-5 text-sm leading-relaxed text-papersoft">
+              <span class="font-medium text-paperink">Batas alat ini.</span>
+              Ia memeriksa struktur dan keutuhan isi QR, bukan reputasi penjual. QR yang sah tetap bisa dipakai orang yang tidak jujur,
+              jadi pemeriksaan terakhir tetap di tangan Anda: cocokkan nama penerima di aplikasi pembayaran sebelum memasukkan PIN,
+              dan jangan pernah memasukkan PIN atau OTP di halaman web mana pun.
+            </p>
+          </section>
+
+          <footer class="mt-12 text-xs leading-relaxed text-mute">
+            <p class="font-display text-sm font-medium text-txt">CekQRIS<span class="text-gradient">Aman</span></p>
+            <p class="mt-1.5">Proyek gratis untuk pembeli dan pedagang Indonesia.</p>
+          </footer>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    import { assessPayload, MCC_LABELS, ADDITIONAL_DATA_LABELS, formatIdr, type EmvField, type RiskReport, type Verdict } from '../lib/qris';
+    import { decodeBlob, decodeVideoFrame } from '../lib/decode';
+
+    const DEMO_PAYLOAD =
+      '00020101021126610014ID.CO.QRIS.WWW01189360091534567890120210ML123456780303UMI5204541153033605802ID5916TOKO BERKAH JAYA6007JAKARTA61051011062200306TOKO010706KASIR16304C352';
+
+    const $ = (id: string) => document.getElementById(id)!;
+    const statusEl = $('status');
+    const resultEl = $('result');
+
+    function setStatus(text: string, kind: 'info' | 'error' | 'ok') {
+      statusEl.textContent = text;
+      statusEl.className = 'mt-4 rounded-[20px] px-4 py-3 text-sm font-medium ' + (kind === 'error'
+        ? 'bg-badbg text-badbadge'
+        : kind === 'ok'
+          ? 'bg-okbg text-okbadge'
+          : 'bg-infobg text-infotxt');
+    }
+    function clearStatus() { statusEl.className = 'mt-4 hidden rounded-[20px] px-4 py-3 text-sm'; statusEl.textContent = ''; }
+
+    const VERDICTS = {
+      SESUAI_STRUKTUR: { title: 'Struktur QRIS valid', desc: 'Isi kode ini utuh dan sesuai standar QRIS. Tetap cocokkan nama penerima di aplikasi pembayaran Anda dengan nama toko sebelum memasukkan PIN.', cls: 'bg-okbg text-oktxt', titleCls: 'text-oktitle' },
+      PERIKSA_LAGI: { title: 'Periksa lagi sebelum membayar', desc: 'Ada bagian isi QR yang tidak lazim. Jangan lanjutkan pembayaran sebelum Anda yakin nama penerima dan nominalnya benar.', cls: 'bg-warnbg text-warntxt', titleCls: 'text-warntitle' },
+      BERISIKO_TINGGI: { title: 'Berisiko tinggi — jangan bayar', desc: 'Isi kode ini rusak atau telah diubah dari terbitan aslinya. Minta QR lain kepada penjual, atau bayar dengan cara lain.', cls: 'bg-badbg text-badtxt', titleCls: 'text-badtitle' },
+      BUKAN_QRIS: { title: 'Bukan QRIS — pola penipuan quishing', desc: 'Kode ini tidak berisi QRIS pembayaran. Jangan membuka tautannya dan jangan memasukkan data apa pun.', cls: 'bg-badbg text-badtxt ring-1 ring-badtitle/50', titleCls: 'text-badtitle' },
+    } as const;
+
+    const VERDICT_SHORT: Record<Verdict, string> = {
+      SESUAI_STRUKTUR: 'Struktur valid',
+      PERIKSA_LAGI: 'Periksa lagi',
+      BERISIKO_TINGGI: 'Berisiko tinggi',
+      BUKAN_QRIS: 'Bukan QRIS',
+    };
+
+    const TAG_LABELS: Record<string, string> = {
+      '00': 'Format payload', '01': 'Metode inisiasi (11 statis, 12 dinamis)', '52': 'Kategori merchant (MCC)',
+      '53': 'Mata uang', '54': 'Nominal terkunci', '55': 'Indikator tip', '58': 'Negara', '59': 'Nama merchant',
+      '60': 'Kota merchant', '61': 'Kode pos', '62': 'Data tambahan', '63': 'Checksum CRC',
+    };
+
+    function addRow(dl: HTMLElement, label: string, value?: string) {
+      if (!value) return;
+      const row = document.createElement('div');
+      row.className = 'flex items-baseline justify-between gap-4 py-2.5';
+      const dt = document.createElement('dt'); dt.className = 'shrink-0 text-mute'; dt.textContent = label;
+      const dd = document.createElement('dd'); dd.className = 'text-right font-medium text-txt break-all'; dd.textContent = value;
+      row.append(dt, dd);
+      dl.appendChild(row);
+    }
+
+    function flattenFields(fields: EmvField[], depth: number, out: Array<[string, string, string]>) {
+      for (const f of fields) {
+        const indent = '— '.repeat(depth);
+        let label = TAG_LABELS[f.tag] ?? (depth > 0 ? (ADDITIONAL_DATA_LABELS[f.tag] ?? 'Sub-field') : 'Template / field');
+        if (depth === 0 && Number(f.tag) >= 26 && Number(f.tag) <= 51) label = 'Akun merchant';
+        out.push([f.tag, indent + label, f.value]);
+        if (f.children) flattenFields(f.children, depth + 1, out);
+      }
+    }
+
+    function render(report: RiskReport) {
+      const v = VERDICTS[report.verdict];
+      const banner = $('verdict-banner');
+      banner.className = 'rounded-[36px] p-6 sm:p-8 ' + v.cls;
+      const titleEl = $('verdict-title');
+      titleEl.className = 'font-display text-3xl font-medium tracking-tight ' + v.titleCls;
+      titleEl.textContent = v.title;
+      $('verdict-desc').textContent = v.desc;
+      $('verdict-score').textContent = String(report.score);
+
+      const d = report.data;
+      const card = $('merchant-card');
+      const rows = $('m-rows');
+      rows.replaceChildren();
+      if (d) {
+        card.classList.remove('hidden');
+        $('m-name').textContent = d.merchantName ?? '(nama tidak tercantum di dalam QR)';
+        addRow(rows, 'Kota', d.merchantCity);
+        addRow(rows, 'Jenis QR', d.isDynamic ? 'Dinamis (dibuat per transaksi)' : 'Statis (stiker / cetakan)');
+        if (d.amount) addRow(rows, 'Nominal terkunci', 'Rp' + formatIdr(d.amount));
+        addRow(rows, 'Mata uang', d.currencyCode === '360' ? 'Rupiah (IDR)' : d.currencyCode);
+        if (d.merchantCategoryCode) addRow(rows, 'Kategori usaha', (MCC_LABELS[d.merchantCategoryCode] ?? 'Kode ' + d.merchantCategoryCode));
+        if (d.qrisAccount) {
+          addRow(rows, 'Penerbit QRIS', d.qrisAccount.globalId);
+          addRow(rows, 'PAN merchant', d.qrisAccount.merchantPan);
+          addRow(rows, 'ID merchant', d.qrisAccount.merchantId);
+        }
+        addRow(rows, 'Checksum CRC', d.crcValue ? (d.crcValid ? d.crcValue + ' — cocok' : d.crcValue + ' — TIDAK cocok') : 'tidak ada');
+        for (const [tag, val] of Object.entries(d.additionalData)) {
+          addRow(rows, ADDITIONAL_DATA_LABELS[tag] ?? 'Data tambahan ' + tag, val);
+        }
+      } else {
+        card.classList.add('hidden');
+      }
+
+      const ul = $('signals');
+      ul.replaceChildren();
+      const icons = { danger: '✕', warn: '!', ok: '✓', info: 'i' } as const;
+      const colors = {
+        danger: 'bg-badbg text-badtitle',
+        warn: 'bg-warnbg text-warntitle',
+        ok: 'bg-okbg text-oktitle',
+        info: 'bg-infobg text-gsoft',
+      } as const;
+      for (const s of report.signals) {
+        const li = document.createElement('li');
+        li.className = 'flex gap-3';
+        const badge = document.createElement('span');
+        badge.className = 'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ' + colors[s.level];
+        badge.textContent = icons[s.level];
+        const body = document.createElement('div');
+        const t = document.createElement('p'); t.className = 'font-medium text-txt'; t.textContent = s.title;
+        const det = document.createElement('p'); det.className = 'text-sm leading-relaxed text-soft'; det.textContent = s.detail;
+        body.append(t, det);
+        li.append(badge, body);
+        ul.appendChild(li);
+      }
+
+      const tbody = $('fields-table');
+      tbody.replaceChildren();
+      if (d) {
+        const flat: Array<[string, string, string]> = [];
+        flattenFields(d.fields, 0, flat);
+        for (const [tag, label, value] of flat) {
+          const tr = document.createElement('tr');
+          tr.className = 'border-t border-line align-top';
+          const c1 = document.createElement('td'); c1.className = 'py-1.5 pr-3 text-mute'; c1.textContent = tag;
+          const c2 = document.createElement('td'); c2.className = 'py-1.5 pr-3 font-sans text-soft'; c2.textContent = label;
+          const c3 = document.createElement('td'); c3.className = 'py-1.5 text-txt break-all'; c3.textContent = value;
+          tr.append(c1, c2, c3);
+          tbody.appendChild(tr);
+        }
+        ($('raw-payload') as HTMLElement).textContent = d.raw;
+      }
+      $('empty-state').classList.add('hidden');
+      resultEl.classList.remove('hidden');
+      if (window.innerWidth < 1024) resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* ---------------- History (localStorage, this device only) ---------------- */
+    interface HistoryItem { ts: number; payload: string; name: string; verdict: Verdict }
+    const HISTORY_KEY = 'cekqrisaman-history';
+    const HISTORY_MAX = 10;
+
+    function loadHistory(): HistoryItem[] {
+      try {
+        const raw = localStorage.getItem(HISTORY_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr.filter((x) => x && typeof x.payload === 'string') : [];
+      } catch { return []; }
+    }
+    function saveHistory(items: HistoryItem[]) {
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, HISTORY_MAX))); } catch { /* storage full/blocked */ }
+    }
+    function dotClass(verdict: Verdict): string {
+      return verdict === 'SESUAI_STRUKTUR' ? 'bg-oktitle' : verdict === 'PERIKSA_LAGI' ? 'bg-warntitle' : 'bg-badtitle';
+    }
+    function renderHistory() {
+      const items = loadHistory();
+      const list = $('history-list');
+      list.replaceChildren();
+      $('history-empty').classList.toggle('hidden', items.length > 0);
+      $('btn-clear-history').classList.toggle('hidden', items.length === 0);
+      for (const item of items) {
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'flex w-full items-center gap-3 rounded-[16px] px-3 py-2.5 text-left transition hover:bg-card';
+        const dot = document.createElement('span');
+        dot.className = 'h-2.5 w-2.5 shrink-0 rounded-full ' + dotClass(item.verdict);
+        const body = document.createElement('span');
+        body.className = 'min-w-0';
+        const name = document.createElement('span');
+        name.className = 'block truncate text-sm font-medium text-txt';
+        name.textContent = item.name;
+        const sub = document.createElement('span');
+        sub.className = 'block text-xs text-mute';
+        sub.textContent = VERDICT_SHORT[item.verdict] + ' · ' + new Date(item.ts).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        body.append(name, sub);
+        btn.append(dot, body);
+        btn.addEventListener('click', () => {
+          ($('payload-input') as HTMLTextAreaElement).value = item.payload;
+          checkPayload(item.payload, false);
+        });
+        li.appendChild(btn);
+        list.appendChild(li);
+      }
+    }
+    function pushHistory(report: RiskReport, payload: string) {
+      const name = report.data?.merchantName ?? (report.verdict === 'BUKAN_QRIS' ? 'Bukan QRIS (tautan/teks)' : 'QR tanpa nama merchant');
+      const items = loadHistory().filter((x) => x.payload !== payload);
+      items.unshift({ ts: Date.now(), payload, name, verdict: report.verdict });
+      saveHistory(items);
+      renderHistory();
+    }
+    $('btn-clear-history').addEventListener('click', () => { saveHistory([]); renderHistory(); });
+    renderHistory();
+
+    function checkPayload(text: string, record = true) {
+      clearStatus();
+      const report = assessPayload(text);
+      render(report);
+      if (record) pushHistory(report, text.trim());
+    }
+
+    async function handleFile(file: File) {
+      stopCamera();
+      setStatus('Membaca kode QR dari foto…', 'info');
+      try {
+        const text = await decodeBlob(file);
+        if (!text) {
+          setStatus('Kode QR tidak terbaca dari foto ini. Coba foto yang lebih terang, lurus, dan memenuhi bingkai — atau tempel teks isi QR secara manual.', 'error');
+          return;
+        }
+        setStatus('Kode QR terbaca. Hasil pemeriksaan tampil di kanvas utama.', 'ok');
+        checkPayload(text);
+      } catch (err) {
+        setStatus('Foto tidak bisa diproses: ' + (err instanceof Error ? err.message : String(err)), 'error');
+      }
+    }
+
+    // Camera scanning
+    let stream: MediaStream | null = null;
+    let scanTimer: number | undefined;
+    const video = $('camera') as HTMLVideoElement;
+
+    function stopCamera() {
+      if (scanTimer) window.clearInterval(scanTimer);
+      scanTimer = undefined;
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      stream = null;
+      $('camera-wrap').classList.add('hidden');
+      $('btn-camera').textContent = 'Scan dengan kamera';
+    }
+
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      } catch {
+        setStatus('Kamera tidak bisa diakses. Izinkan akses kamera di browser, atau gunakan upload foto.', 'error');
+        return;
+      }
+      video.srcObject = stream;
+      $('camera-wrap').classList.remove('hidden');
+      $('btn-camera').textContent = 'Kamera menyala…';
+      setStatus('Arahkan kamera ke kode QRIS. Pemindaian berjalan otomatis.', 'info');
+      scanTimer = window.setInterval(async () => {
+        const text = await decodeVideoFrame(video);
+        if (text) {
+          stopCamera();
+          setStatus('Kode QR terbaca. Hasil pemeriksaan tampil di kanvas utama.', 'ok');
+          checkPayload(text);
+        }
+      }, 450);
+    }
+
+    $('btn-camera').addEventListener('click', () => { stream ? stopCamera() : startCamera(); });
+    $('btn-stop-camera').addEventListener('click', stopCamera);
+
+    const fileInput = $('file-input') as HTMLInputElement;
+    fileInput.addEventListener('change', () => {
+      const f = fileInput.files?.[0];
+      if (f) handleFile(f);
+      fileInput.value = '';
+    });
+
+    const dz = $('dropzone');
+    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('border-gbright', 'bg-infobg'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('border-gbright', 'bg-infobg'));
+    dz.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dz.classList.remove('border-gbright', 'bg-infobg');
+      const f = e.dataTransfer?.files?.[0];
+      if (f) handleFile(f);
+    });
+    document.addEventListener('paste', (e) => {
+      const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith('image/'));
+      const f = item?.getAsFile();
+      if (f) handleFile(f);
+    });
+
+    $('btn-check-payload').addEventListener('click', () => {
+      const text = ($('payload-input') as HTMLTextAreaElement).value;
+      if (text.trim()) checkPayload(text);
+      else setStatus('Tempel teks isi QR terlebih dahulu.', 'error');
+    });
+    $('btn-demo').addEventListener('click', () => {
+      ($('payload-input') as HTMLTextAreaElement).value = DEMO_PAYLOAD;
+      checkPayload(DEMO_PAYLOAD);
+    });
+  </script>
+</Layout>
