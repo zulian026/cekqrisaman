@@ -312,3 +312,45 @@ export function formatIdr(amount: string): string {
   if (!Number.isFinite(num)) return amount;
   return num.toLocaleString('id-ID', { maximumFractionDigits: 2 });
 }
+
+/* --------------------- Merchant reference comparison --------------------- */
+
+export interface ReferenceDiff {
+  field: string;
+  reference?: string;
+  scanned?: string;
+}
+
+export interface ReferenceComparison {
+  /** Raw payloads are character-for-character equal. */
+  identical: boolean;
+  /** Merchant name in the scan equals the reference name. */
+  nameMatches: boolean;
+  diffs: ReferenceDiff[];
+}
+
+/**
+ * Compare a scanned payload against the merchant's own saved reference
+ * payload (Mode Pedagang anti-tamper check). Any field difference means the
+ * scanned sticker is NOT the merchant's original QRIS.
+ */
+export function compareWithReference(referenceRaw: string, scannedRaw: string): ReferenceComparison {
+  const identical = referenceRaw.trim() === scannedRaw.trim();
+  let ref: QrisData | undefined;
+  let scan: QrisData | undefined;
+  try { ref = parseQris(referenceRaw); } catch { /* reference unparsable */ }
+  try { scan = parseQris(scannedRaw); } catch { /* scan unparsable */ }
+  const diffs: ReferenceDiff[] = [];
+  const check = (field: string, a?: string, b?: string) => {
+    if ((a ?? '') !== (b ?? '')) diffs.push({ field, reference: a, scanned: b });
+  };
+  check('Nama merchant', ref?.merchantName, scan?.merchantName);
+  check('Kota merchant', ref?.merchantCity, scan?.merchantCity);
+  check('PAN merchant', ref?.qrisAccount?.merchantPan, scan?.qrisAccount?.merchantPan);
+  check('ID merchant', ref?.qrisAccount?.merchantId, scan?.qrisAccount?.merchantId);
+  check('Penerbit QRIS', ref?.qrisAccount?.globalId, scan?.qrisAccount?.globalId);
+  check('Jenis QR', ref ? (ref.isDynamic ? 'Dinamis' : 'Statis') : undefined, scan ? (scan.isDynamic ? 'Dinamis' : 'Statis') : undefined);
+  check('Nominal terkunci', ref?.amount, scan?.amount);
+  const nameMatches = !!ref?.merchantName && ref.merchantName === scan?.merchantName;
+  return { identical, nameMatches, diffs };
+}

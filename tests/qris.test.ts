@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseQris, crc16Ccitt, assessPayload } from '../src/lib/qris';
+import { parseQris, crc16Ccitt, assessPayload, compareWithReference } from '../src/lib/qris';
 
 // Vectors generated and CRC-signed with an independent Python implementation
 // of CRC-16/CCITT-FALSE — cross-checks the TypeScript implementation.
@@ -79,5 +79,32 @@ describe('assessPayload', () => {
   it('flags a structurally broken EMV-looking payload', () => {
     const r = assessPayload('0002010102ZZZZ');
     expect(['BERISIKO_TINGGI', 'BUKAN_QRIS']).toContain(r.verdict);
+  });
+});
+
+describe('compareWithReference', () => {
+  it('reports an identical sticker as a perfect match', () => {
+    const c = compareWithReference(STATIC_QRIS, STATIC_QRIS);
+    expect(c.identical).toBe(true);
+    expect(c.nameMatches).toBe(true);
+    expect(c.diffs).toHaveLength(0);
+  });
+  it('detects a swapped merchant id (sticker replaced)', () => {
+    const swapped = STATIC_QRIS.replace('ML12345678', 'ML87654321');
+    const c = compareWithReference(STATIC_QRIS, swapped);
+    expect(c.identical).toBe(false);
+    expect(c.diffs.map((d) => d.field)).toContain('ID merchant');
+  });
+  it('detects a different merchant entirely', () => {
+    const c = compareWithReference(STATIC_QRIS, DYNAMIC_QRIS);
+    expect(c.identical).toBe(false);
+    expect(c.nameMatches).toBe(false);
+    expect(c.diffs.map((d) => d.field)).toContain('Nama merchant');
+  });
+  it('handles a non-QRIS scan without throwing', () => {
+    const c = compareWithReference(STATIC_QRIS, 'https://qris-palsu.example.com/bayar');
+    expect(c.identical).toBe(false);
+    expect(c.nameMatches).toBe(false);
+    expect(c.diffs.length).toBeGreaterThan(0);
   });
 });

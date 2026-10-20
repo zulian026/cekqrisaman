@@ -53,6 +53,27 @@ import Layout from '../layouts/Layout.astro';
         <p id="history-empty" class="mt-3 text-sm leading-relaxed text-dmute">Belum ada pemeriksaan. Hasil scan akan tersimpan di sini, hanya di browser Anda.</p>
         <ul id="history-list" class="mt-2 space-y-1"></ul>
       </div>
+
+      <div class="border-t border-darkline px-6 py-5">
+        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-dmute">Mode Pedagang</p>
+        <div id="ref-empty">
+          <p class="mt-3 text-sm leading-relaxed text-dmute">
+            Simpan QRIS Anda sendiri sebagai referensi. Setiap pemeriksaan sesudahnya dibandingkan dengan referensi itu —
+            stiker yang ditempel orang lain akan langsung ketahuan berbeda.
+          </p>
+          <p class="mt-2 text-sm leading-relaxed text-dsoft">
+            Caranya: periksa QRIS Anda sekali, lalu klik <span class="font-semibold text-wht">Simpan sebagai QRIS saya</span> pada hasil pemeriksaan.
+          </p>
+        </div>
+        <div id="ref-saved" class="hidden">
+          <p id="ref-name" class="font-display mt-3 text-lg font-bold leading-snug text-wht"></p>
+          <p id="ref-meta" class="mt-0.5 text-xs text-dmute"></p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button id="btn-view-card" type="button" class="rounded-full bg-wht px-4 py-2 text-sm font-semibold text-dark transition hover:bg-white">Kartu verifikasi</button>
+            <button id="btn-delete-ref" type="button" class="rounded-full border border-darkline px-4 py-2 text-sm font-semibold text-dsoft transition hover:bg-dark2">Hapus referensi</button>
+          </div>
+        </div>
+      </div>
     </aside>
 
     <!-- ============ MAIN: porcelain canvas ============ -->
@@ -89,10 +110,17 @@ import Layout from '../layouts/Layout.astro';
             <p class="mt-4 text-xs opacity-80">Skor risiko struktural: <span id="verdict-score" class="font-bold"></span>/100. Skor ini menilai isi kode QR, bukan reputasi penjual.</p>
           </div>
 
+          <div id="compare-banner" class="mt-4 hidden rounded-3xl p-6 sm:p-7">
+            <p id="compare-title" class="font-display text-2xl font-extrabold tracking-tight"></p>
+            <p id="compare-desc" class="mt-1.5 text-sm leading-relaxed"></p>
+            <ul id="compare-diffs" class="mt-3 space-y-1.5 text-sm"></ul>
+          </div>
+
           <div id="merchant-card" class="mt-4 rounded-3xl bg-cardw p-6 shadow-[0_18px_50px_-24px_rgba(12,16,22,0.25)] ring-1 ring-linel sm:p-8">
             <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-faint">Nama penerima di dalam QR</p>
             <p id="m-name" class="font-display mt-3 text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl"></p>
             <dl id="m-rows" class="mt-6 divide-y divide-linel text-sm"></dl>
+            <button id="btn-save-ref" type="button" class="mt-6 w-full rounded-full border border-linel px-5 py-3 font-semibold text-ink transition hover:border-teald hover:text-teald">Simpan sebagai QRIS saya (Mode Pedagang)</button>
           </div>
 
           <div class="mt-4 rounded-3xl bg-cardw p-6 shadow-[0_18px_50px_-24px_rgba(12,16,22,0.25)] ring-1 ring-linel sm:p-8">
@@ -156,6 +184,23 @@ import Layout from '../layouts/Layout.astro';
           </p>
         </section>
 
+        <section id="verify-card-section" class="mt-14 hidden">
+          <p class="text-xs font-semibold uppercase tracking-[0.25em] text-teald">Kartu verifikasi pedagang</p>
+          <div id="verify-card" class="mt-4 rounded-3xl bg-dark p-8 text-wht sm:p-10">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.25em] text-teal">QRIS resmi toko ini</p>
+            <p id="vc-name" class="font-display mt-3 text-4xl font-extrabold leading-[1.02] tracking-tight sm:text-5xl"></p>
+            <p id="vc-city" class="mt-2 text-dsoft"></p>
+            <p class="mt-6 border-t border-darkline pt-5 text-sm leading-relaxed text-dsoft">
+              Sebelum memasukkan PIN, cocokkan nama penerima yang muncul di aplikasi pembayaran Anda
+              dengan nama besar di kartu ini. <span class="font-semibold text-wht">Bila berbeda, jangan bayar</span> —
+              kemungkinan stiker QRIS telah ditempel orang lain.
+            </p>
+            <p class="mt-5 text-xs text-dmute">Referensi tersimpan <span id="vc-date"></span> &middot; Periksa mandiri di cekqrisaman.vercel.app</p>
+          </div>
+          <button id="btn-print-card" type="button" class="mt-4 rounded-full bg-dark px-6 py-3 font-semibold text-wht transition hover:bg-dark2">Cetak kartu</button>
+          <p class="mt-2.5 text-sm text-grey">Cetak dan tempel kartu ini di samping stiker QRIS Anda. Pembeli akan ikut mengawasi nama penerima setiap kali membayar.</p>
+        </section>
+
         <footer class="mt-12 text-xs leading-relaxed text-faint">
           <p class="font-display text-base font-extrabold tracking-tight text-ink">CekQRIS<span class="text-teald">Aman</span></p>
           <p class="mt-1.5">Proyek gratis untuk pembeli dan pedagang Indonesia.</p>
@@ -165,7 +210,7 @@ import Layout from '../layouts/Layout.astro';
   </div>
 
   <script>
-    import { assessPayload, MCC_LABELS, ADDITIONAL_DATA_LABELS, formatIdr, type EmvField, type RiskReport, type Verdict } from '../lib/qris';
+    import { assessPayload, compareWithReference, MCC_LABELS, ADDITIONAL_DATA_LABELS, formatIdr, type EmvField, type RiskReport, type Verdict } from '../lib/qris';
     import { decodeBlob, decodeVideoFrame } from '../lib/decode';
 
     const DEMO_PAYLOAD =
@@ -363,10 +408,107 @@ import Layout from '../layouts/Layout.astro';
     $('btn-clear-history').addEventListener('click', () => { saveHistory([]); renderHistory(); });
     renderHistory();
 
+    /* ---------------- Mode Pedagang: reference QRIS ---------------- */
+    interface StoredReference { payload: string; name: string; city?: string; savedAt: number }
+    const REF_KEY = 'cekqrisaman-reference';
+    let lastCheckedPayload = '';
+    let lastReport: RiskReport | null = null;
+
+    function loadReference(): StoredReference | null {
+      try {
+        const raw = localStorage.getItem(REF_KEY);
+        const obj = raw ? JSON.parse(raw) : null;
+        return obj && typeof obj.payload === 'string' && typeof obj.name === 'string' ? obj : null;
+      } catch { return null; }
+    }
+    function saveReference(ref: StoredReference | null) {
+      try {
+        if (ref) localStorage.setItem(REF_KEY, JSON.stringify(ref));
+        else localStorage.removeItem(REF_KEY);
+      } catch { /* storage blocked */ }
+    }
+    function fmtDate(ts: number): string {
+      return new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+    function renderReference() {
+      const ref = loadReference();
+      $('ref-empty').classList.toggle('hidden', !!ref);
+      $('ref-saved').classList.toggle('hidden', !ref);
+      $('verify-card-section').classList.toggle('hidden', !ref);
+      if (ref) {
+        $('ref-name').textContent = ref.name;
+        $('ref-meta').textContent = 'Referensi sejak ' + fmtDate(ref.savedAt) + (ref.city ? ' · ' + ref.city : '');
+        $('vc-name').textContent = ref.name;
+        $('vc-city').textContent = ref.city ?? '';
+        $('vc-date').textContent = fmtDate(ref.savedAt);
+      }
+    }
+    function renderCompare(scannedPayload: string) {
+      const banner = $('compare-banner');
+      const ref = loadReference();
+      if (!ref || !scannedPayload) { banner.classList.add('hidden'); return; }
+      const cmp = compareWithReference(ref.payload, scannedPayload);
+      const diffsEl = $('compare-diffs');
+      diffsEl.replaceChildren();
+      if (cmp.identical) {
+        banner.className = 'mt-4 rounded-3xl p-6 sm:p-7 bg-vokbg text-voktxt';
+        $('compare-title').className = 'font-display text-2xl font-extrabold tracking-tight text-voktitle';
+        $('compare-title').textContent = 'Cocok — ini QRIS referensi Anda';
+        $('compare-desc').textContent = 'Isi QR yang ter-scan sama persis, karakter demi karakter, dengan QRIS yang Anda simpan sebagai referensi. Stiker ini asli milik Anda.';
+      } else {
+        banner.className = 'mt-4 rounded-3xl p-6 sm:p-7 bg-vbadbg text-vbadtxt ring-2 ring-vbadtitle/60';
+        $('compare-title').className = 'font-display text-2xl font-extrabold tracking-tight text-vbadtitle';
+        $('compare-title').textContent = 'Tidak cocok — ini bukan QRIS referensi Anda';
+        $('compare-desc').textContent = 'Isi QR yang ter-scan berbeda dari referensi "' + ref.name + '". Bila QR ini menempel di toko Anda, stiker Anda kemungkinan telah diganti atau ditimpa orang lain. Perbedaan yang ditemukan:';
+        for (const diff of cmp.diffs) {
+          const li = document.createElement('li');
+          const strong = document.createElement('span');
+          strong.className = 'font-semibold';
+          strong.textContent = diff.field + ': ';
+          const val = document.createElement('span');
+          val.textContent = 'referensi "' + (diff.reference ?? '—') + '" ≠ ter-scan "' + (diff.scanned ?? '—') + '"';
+          li.append(strong, val);
+          diffsEl.appendChild(li);
+        }
+        if (cmp.diffs.length === 0) {
+          const li = document.createElement('li');
+          li.textContent = 'Payload berbeda pada bagian data tambahan, tetapi identitas utama sama. Tetap waspada.';
+          diffsEl.appendChild(li);
+        }
+      }
+      banner.classList.remove('hidden');
+    }
+    $('btn-save-ref').addEventListener('click', () => {
+      if (!lastReport?.data || !lastCheckedPayload) return;
+      saveReference({
+        payload: lastCheckedPayload,
+        name: lastReport.data.merchantName ?? 'QRIS tanpa nama',
+        city: lastReport.data.merchantCity,
+        savedAt: Date.now(),
+      });
+      renderReference();
+      renderCompare(lastCheckedPayload);
+      setStatus('QRIS referensi tersimpan. Mulai sekarang setiap pemeriksaan dibandingkan dengannya, dan kartu verifikasi Anda sudah siap di kanvas utama.', 'ok');
+    });
+    $('btn-delete-ref').addEventListener('click', () => {
+      saveReference(null);
+      renderReference();
+      $('compare-banner').classList.add('hidden');
+      setStatus('QRIS referensi dihapus dari perangkat ini.', 'info');
+    });
+    $('btn-view-card').addEventListener('click', () => {
+      $('verify-card-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    $('btn-print-card').addEventListener('click', () => window.print());
+    renderReference();
+
     function checkPayload(text: string, record = true) {
       clearStatus();
       const report = assessPayload(text);
+      lastCheckedPayload = text.trim();
+      lastReport = report;
       render(report);
+      renderCompare(lastCheckedPayload);
       if (record) pushHistory(report, text.trim());
     }
 

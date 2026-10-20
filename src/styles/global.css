@@ -51,3 +51,20 @@ html {
   background: #27b7a5;
   color: #0c1016;
 }
+
+/* Print: only the merchant verification card goes on paper. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #verify-card,
+  #verify-card * {
+    visibility: visible;
+  }
+  #verify-card {
+    position: absolute;
+    inset: 0;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
