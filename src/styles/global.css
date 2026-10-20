@@ -1,68 +1,53 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Google Sans Flex", "Google Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-mono: "Google Sans Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Manrope", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Dark palette — every text/background pair WCAG-checked >= 4.5:1 (see project notes) */
-  --color-page: #0b0e13;
-  --color-panel: #10131a;
-  --color-card: #15181f;
-  --color-head: #171a21;
-  --color-input: #0d1017;
-  --color-line: #2a2e37;
-  --color-txt: #f1f3f4;
-  --color-soft: #c9ced6;
-  --color-mute: #9aa0a6;
-
-  --color-gblue: #1a73e8;
-  --color-gbright: #4285f4;
-  --color-gsoft: #8ab4f8;
+  /* SOHub-inspired palette — every text/background pair WCAG-checked >= 4.5:1.
+     Light porcelain canvas (#f0f6f8) + near-black ink (#0c1016), dark console
+     sidebar and dark blocks in SOHub near-black, teal accent #27b7a5. */
+  --color-paper: #f0f6f8;
+  --color-ink: #0c1016;
+  --color-grey: #434f65;
+  --color-faint: #50555a;
+  --color-cardw: #ffffff;
+  --color-linel: #d9e0e3;
+  --color-dark: #0c1016;
+  --color-dark2: #1e232c;
+  --color-darkline: #2b3038;
+  --color-dinput: #05070a;
+  --color-wht: #f0f6f8;
+  --color-dsoft: #c8cfd1;
+  --color-dmute: #a5abad;
+  --color-teal: #27b7a5;
+  --color-teald: #0b6e60;
+  --color-dotwarn: #f0b429;
+  /* status boxes (on the dark sidebar) */
   --color-infobg: #122c52;
   --color-infotxt: #a9c6fa;
-
-  --color-okbg: #0f2e1d;
-  --color-oktitle: #5fd68a;
-  --color-oktxt: #c4e7cf;
+  --color-okbgd: #0f2e1d;
   --color-okbadge: #7ee2a8;
-
-  --color-warnbg: #2e2305;
-  --color-warntitle: #fdd663;
-  --color-warntxt: #f5e3ac;
-
-  --color-badbg: #331511;
-  --color-badtitle: #f28b82;
-  --color-badtxt: #f6c9c4;
-  --color-badbadge: #f2a49e;
-
-  --color-stepbg: #1c2f4d;
-
-  --color-paper: #f8f9fc;
-  --color-paperink: #121317;
-  --color-papersoft: #45474d;
+  --color-errbg: #331511;
+  --color-errbadge: #f2a49e;
+  /* verdict banners (on the light canvas) */
+  --color-vokbg: #dcf2e4;
+  --color-voktitle: #0a5c2e;
+  --color-voktxt: #173d27;
+  --color-vwarnbg: #fbeec0;
+  --color-vwarntitle: #7a4d00;
+  --color-vwarntxt: #54420c;
+  --color-vbadbg: #fbe3df;
+  --color-vbadtitle: #9c2b1f;
+  --color-vbadtxt: #5f2019;
 }
 
 html {
   scroll-behavior: smooth;
 }
 
-body {
-  background: var(--color-page);
-  color: var(--color-txt);
-}
-
-.font-display {
-  font-variation-settings: "ROND" 100;
-}
-
-.text-gradient {
-  background: linear-gradient(90deg, #4285f4, #8ab4f8 55%, #c58af9);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
 ::selection {
-  background: #122c52;
-  color: #f1f3f4;
+  background: #27b7a5;
+  color: #0c1016;
 }

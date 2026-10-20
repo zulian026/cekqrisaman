@@ -1,6 +1,6 @@
 /* CekQRISAman service worker — cache-first for the app shell so the tool
    keeps working offline after the first visit. Bump VERSION on each release. */
-const VERSION = 'cekqrisaman-v4';
+const VERSION = 'cekqrisaman-v5';
 const CORE = ['/', '/manifest.webmanifest', '/icons/icon.svg'];
 
 self.addEventListener('install', (event) => {
