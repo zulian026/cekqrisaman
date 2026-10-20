@@ -207,6 +207,21 @@ export interface RiskReport {
 
 const URL_RE = /https?:\/\/|www\.|\.com\b|\.id\b|\.xyz\b|\.top\b|\.link\b/i;
 
+const SHORTENER_HOSTS = new Set([
+  'bit.ly', 'tinyurl.com', 's.id', 't.co', 'goo.gl', 'ow.ly', 'rb.gy', 'cutt.ly',
+  'shorturl.at', 'is.gd', 'buff.ly', 'rebrand.ly', 'bl.ink', 'short.io', 'linktr.ee', 'shorte.st',
+]);
+
+function shortenerHost(raw: string): string | null {
+  try {
+    const u = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    return SHORTENER_HOSTS.has(host) ? host : null;
+  } catch {
+    return null;
+  }
+}
+
 export function assessPayload(rawInput: string): RiskReport {
   const raw = (rawInput ?? '').trim();
   const signals: RiskSignal[] = [];
@@ -226,6 +241,14 @@ export function assessPayload(rawInput: string): RiskReport {
     });
     if (URL_RE.test(raw)) {
       signals.push({ level: 'warn', title: 'Berisi alamat web', detail: `Tujuan yang terbaca: ${raw.slice(0, 120)}` });
+    }
+    const shortHost = shortenerHost(raw);
+    if (shortHost) {
+      signals.push({
+        level: 'danger',
+        title: 'Tautan pemendek URL',
+        detail: `Alamat ini memakai pemendek ${shortHost}, sehingga tujuan akhirnya disembunyikan. Stiker QRIS resmi tidak pernah memakai pemendek tautan — pola ini khas tempelan penipuan. Jangan buka.`,
+      });
     }
     return { verdict: 'BUKAN_QRIS', score: 100, signals };
   }

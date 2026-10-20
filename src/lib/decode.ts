@@ -55,6 +55,53 @@ export async function decodeImageData(imageData: ImageData): Promise<string | nu
   return results.length > 0 ? results[0].text : null;
 }
 
+function makeCanvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] | null {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  return ctx ? [canvas, ctx] : null;
+}
+
+function rotateImageData(src: ImageData, angle: 90 | 180 | 270): ImageData | null {
+  const [srcCanvas, srcCtx] = makeCanvas(src.width, src.height) ?? [];
+  if (!srcCanvas || !srcCtx) return null;
+  srcCtx.putImageData(src, 0, 0);
+  const swap = angle !== 180;
+  const [outCanvas, outCtx] = makeCanvas(swap ? src.height : src.width, swap ? src.width : src.height) ?? [];
+  if (!outCanvas || !outCtx) return null;
+  outCtx.translate(outCanvas.width / 2, outCanvas.height / 2);
+  outCtx.rotate((angle * Math.PI) / 180);
+  outCtx.drawImage(srcCanvas, -src.width / 2, -src.height / 2);
+  return outCtx.getImageData(0, 0, outCanvas.width, outCanvas.height);
+}
+
+function centerCropImageData(src: ImageData, fraction = 0.55, upscale = 1.6): ImageData | null {
+  const [srcCanvas, srcCtx] = makeCanvas(src.width, src.height) ?? [];
+  if (!srcCanvas || !srcCtx) return null;
+  srcCtx.putImageData(src, 0, 0);
+  const cw = Math.round(src.width * fraction);
+  const ch = Math.round(src.height * fraction);
+  const sx = Math.round((src.width - cw) / 2);
+  const sy = Math.round((src.height - ch) / 2);
+  const [outCanvas, outCtx] = makeCanvas(Math.round(cw * upscale), Math.round(ch * upscale)) ?? [];
+  if (!outCanvas || !outCtx) return null;
+  outCtx.imageSmoothingEnabled = true;
+  outCtx.drawImage(srcCanvas, sx, sy, cw, ch, 0, 0, outCanvas.width, outCanvas.height);
+  return outCtx.getImageData(0, 0, outCanvas.width, outCanvas.height);
+}
+
+function contrastImageData(src: ImageData): ImageData {
+  const out = new ImageData(new Uint8ClampedArray(src.data), src.width, src.height);
+  const d = out.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const stretched = Math.max(0, Math.min(255, (lum - 128) * 1.5 + 128));
+    d[i] = d[i + 1] = d[i + 2] = stretched;
+  }
+  return out;
+}
+
 export async function decodeBlob(blob: Blob): Promise<string | null> {
   const detector = getBarcodeDetector();
   if (detector) {
@@ -62,7 +109,7 @@ export async function decodeBlob(blob: Blob): Promise<string | null> {
       const codes = await detector.detect(blob as ImageBitmapSource);
       if (codes.length > 0) return codes[0].rawValue;
     } catch {
-      /* fall through to canvas + ZXing */
+      /* fall through to canvas pipeline */
     }
   }
   const bitmap = await createImageBitmap(blob);
@@ -75,8 +122,33 @@ export async function decodeBlob(blob: Blob): Promise<string | null> {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    return await decodeImageData(imageData);
+    const base = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    // Attempt 1: as-is (native detector, then ZXing with rotate/invert).
+    const direct = await decodeImageData(base);
+    if (direct) return direct;
+
+    // Attempt 2: physical rotations — sideways or upside-down sticker photos.
+    for (const angle of [90, 180, 270] as const) {
+      const rotated = rotateImageData(base, angle);
+      if (!rotated) continue;
+      const hit = await decodeImageData(rotated);
+      if (hit) return hit;
+    }
+
+    // Attempt 3: zoom into the centre — small QR photographed from afar.
+    const cropped = centerCropImageData(base);
+    if (cropped) {
+      const hit = await decodeImageData(cropped);
+      if (hit) return hit;
+    }
+
+    // Attempt 4: contrast-stretched greyscale — faded print, glare, low light.
+    const contrasted = contrastImageData(base);
+    const hit = await decodeImageData(contrasted);
+    if (hit) return hit;
+
+    return null;
   } finally {
     bitmap.close();
   }

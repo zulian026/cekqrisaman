@@ -116,6 +116,11 @@ import Layout from '../layouts/Layout.astro';
             <ul id="compare-diffs" class="mt-3 space-y-1.5 text-sm"></ul>
           </div>
 
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button id="btn-speak" type="button" class="rounded-full bg-dark px-5 py-3 font-semibold text-wht transition hover:bg-dark2">Bacakan hasil</button>
+            <button id="btn-share" type="button" class="rounded-full border border-linel bg-cardw px-5 py-3 font-semibold text-ink transition hover:border-teald hover:text-teald">Bagikan sebagai gambar</button>
+          </div>
+
           <div id="merchant-card" class="mt-4 rounded-3xl bg-cardw p-6 shadow-[0_18px_50px_-24px_rgba(12,16,22,0.25)] ring-1 ring-linel sm:p-8">
             <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-faint">Nama penerima di dalam QR</p>
             <p id="m-name" class="font-display mt-3 text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl"></p>
@@ -413,6 +418,7 @@ import Layout from '../layouts/Layout.astro';
     const REF_KEY = 'cekqrisaman-reference';
     let lastCheckedPayload = '';
     let lastReport: RiskReport | null = null;
+    let lastComparisonNote = '';
 
     function loadReference(): StoredReference | null {
       try {
@@ -446,16 +452,19 @@ import Layout from '../layouts/Layout.astro';
     function renderCompare(scannedPayload: string) {
       const banner = $('compare-banner');
       const ref = loadReference();
+      lastComparisonNote = '';
       if (!ref || !scannedPayload) { banner.classList.add('hidden'); return; }
       const cmp = compareWithReference(ref.payload, scannedPayload);
       const diffsEl = $('compare-diffs');
       diffsEl.replaceChildren();
       if (cmp.identical) {
+        lastComparisonNote = 'QR ini cocok dengan QRIS referensi Anda.';
         banner.className = 'mt-4 rounded-3xl p-6 sm:p-7 bg-vokbg text-voktxt';
         $('compare-title').className = 'font-display text-2xl font-extrabold tracking-tight text-voktitle';
         $('compare-title').textContent = 'Cocok — ini QRIS referensi Anda';
         $('compare-desc').textContent = 'Isi QR yang ter-scan sama persis, karakter demi karakter, dengan QRIS yang Anda simpan sebagai referensi. Stiker ini asli milik Anda.';
       } else {
+        lastComparisonNote = 'Perhatian: QR ini TIDAK cocok dengan QRIS referensi Anda.';
         banner.className = 'mt-4 rounded-3xl p-6 sm:p-7 bg-vbadbg text-vbadtxt ring-2 ring-vbadtitle/60';
         $('compare-title').className = 'font-display text-2xl font-extrabold tracking-tight text-vbadtitle';
         $('compare-title').textContent = 'Tidak cocok — ini bukan QRIS referensi Anda';
@@ -522,7 +531,7 @@ import Layout from '../layouts/Layout.astro';
       try {
         const text = await decodeBlob(file);
         if (!text) {
-          setStatus('Kode QR tidak terbaca dari foto ini. Coba foto yang lebih terang, lurus, dan memenuhi bingkai — atau tempel teks isi QR secara manual.', 'error');
+          setStatus('Kode QR tidak terbaca dari foto ini — sudah dicoba dari semua sudut, crop tengah, dan peningkatan kontras. Coba foto yang lebih terang, lurus, dan memenuhi bingkai — atau tempel teks isi QR secara manual.', 'error');
           return;
         }
         setStatus('Kode QR terbaca. Hasil pemeriksaan tampil di kanvas utama.', 'ok');
@@ -600,6 +609,143 @@ import Layout from '../layouts/Layout.astro';
     $('btn-demo').addEventListener('click', () => {
       ($('payload-input') as HTMLTextAreaElement).value = DEMO_PAYLOAD;
       checkPayload(DEMO_PAYLOAD);
+    });
+
+    /* ---------------- Bacakan hasil (Web Speech, lokal) ---------------- */
+    let speaking = false;
+    $('btn-speak').addEventListener('click', () => {
+      const btn = $('btn-speak');
+      if (!('speechSynthesis' in window)) {
+        setStatus('Browser ini tidak mendukung baca suara. Hasil tetap bisa dibaca di kanvas utama.', 'error');
+        return;
+      }
+      if (speaking) {
+        speechSynthesis.cancel();
+        speaking = false;
+        btn.textContent = 'Bacakan hasil';
+        return;
+      }
+      if (!lastReport) return;
+      const r = lastReport;
+      const v = VERDICTS[r.verdict];
+      const parts: string[] = ['Hasil pemeriksaan QRIS.', v.title + '.'];
+      if (r.data?.merchantName) parts.push('Nama penerima: ' + r.data.merchantName + '.');
+      if (r.data?.merchantCity) parts.push('Kota: ' + r.data.merchantCity + '.');
+      if (r.data?.amount) parts.push('Nominal terkunci: ' + Number(r.data.amount).toLocaleString('id-ID') + ' rupiah.');
+      if (lastComparisonNote) parts.push(lastComparisonNote);
+      parts.push(v.desc);
+      const utter = new SpeechSynthesisUtterance(parts.join(' '));
+      utter.lang = 'id-ID';
+      const stop = () => { speaking = false; btn.textContent = 'Bacakan hasil'; };
+      utter.onend = stop;
+      utter.onerror = stop;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utter);
+      speaking = true;
+      btn.textContent = 'Berhenti membaca';
+    });
+
+    /* ---------------- Bagikan hasil sebagai gambar ---------------- */
+    const VERDICT_HEX: Record<Verdict, { bg: string; title: string }> = {
+      SESUAI_STRUKTUR: { bg: '#dcf2e4', title: '#0a5c2e' },
+      PERIKSA_LAGI: { bg: '#fbeec0', title: '#7a4d00' },
+      BERISIKO_TINGGI: { bg: '#fbe3df', title: '#9c2b1f' },
+      BUKAN_QRIS: { bg: '#fbe3df', title: '#9c2b1f' },
+    };
+
+    function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+    function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+      const words = text.split(/\s+/);
+      const lines: string[] = [];
+      let line = '';
+      for (const word of words) {
+        const test = line ? line + ' ' + word : word;
+        if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = word; }
+        else line = test;
+      }
+      if (line) lines.push(line);
+      return lines;
+    }
+
+    $('btn-share').addEventListener('click', async () => {
+      if (!lastReport) return;
+      const r = lastReport;
+      const v = VERDICTS[r.verdict];
+      const hex = VERDICT_HEX[r.verdict];
+      const W = 1080, H = 1080;
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      // background + header band
+      ctx.fillStyle = '#f0f6f8'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#0c1016'; ctx.fillRect(0, 0, W, 148);
+      ctx.fillStyle = '#f0f6f8';
+      ctx.font = '800 52px Manrope, Inter, sans-serif';
+      ctx.fillText('CekQRISAman', 64, 95);
+      ctx.fillStyle = '#27b7a5';
+      ctx.font = '600 30px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('HASIL PEMERIKSAAN QRIS', W - 64, 92);
+      ctx.textAlign = 'left';
+      // verdict block
+      ctx.fillStyle = hex.bg;
+      roundRect(ctx, 64, 196, W - 128, 218, 28); ctx.fill();
+      ctx.fillStyle = hex.title;
+      ctx.font = '800 58px Manrope, Inter, sans-serif';
+      const titleLines = wrapLines(ctx, v.title, W - 208).slice(0, 2);
+      titleLines.forEach((ln, i) => ctx.fillText(ln, 104, 282 + i * 66));
+      ctx.font = '500 30px Inter, sans-serif';
+      ctx.fillText('Skor risiko struktural: ' + r.score + '/100', 104, 282 + titleLines.length * 66 + 16);
+      // merchant + facts
+      let y = 492;
+      ctx.fillStyle = '#50555a';
+      ctx.font = '600 26px Inter, sans-serif';
+      ctx.fillText('NAMA PENERIMA DI DALAM QR', 64, y);
+      y += 66;
+      ctx.fillStyle = '#0c1016';
+      ctx.font = '800 62px Manrope, Inter, sans-serif';
+      const name = r.data?.merchantName ?? '(bukan QRIS pembayaran)';
+      wrapLines(ctx, name, W - 128).slice(0, 2).forEach((ln) => { ctx.fillText(ln, 64, y); y += 68; });
+      y += 18;
+      ctx.font = '500 34px Inter, sans-serif';
+      ctx.fillStyle = '#434f65';
+      const facts: string[] = [];
+      if (r.data?.merchantCity) facts.push('Kota: ' + r.data.merchantCity);
+      if (r.data) facts.push(r.data.isDynamic ? 'Jenis: QR dinamis' : 'Jenis: QR statis (stiker)');
+      if (r.data?.amount) facts.push('Nominal terkunci: Rp' + formatIdr(r.data.amount));
+      if (r.data) facts.push(r.data.crcValue ? (r.data.crcValid ? 'Checksum CRC: cocok' : 'Checksum CRC: TIDAK cocok') : 'Checksum CRC: tidak ada');
+      facts.slice(0, 4).forEach((f) => { ctx.fillText(f, 64, y); y += 50; });
+      // footer
+      ctx.fillStyle = '#0c1016';
+      ctx.font = '600 30px Inter, sans-serif';
+      ctx.fillText('Periksa QRIS sebelum membayar: cekqrisaman.vercel.app', 64, H - 108);
+      ctx.fillStyle = '#50555a';
+      ctx.font = '400 26px Inter, sans-serif';
+      ctx.fillText(new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) + ' · Hasil ini menilai isi kode QR, bukan reputasi penjual.', 64, H - 62);
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        const file = new File([blob], 'hasil-cek-qris.png', { type: 'image/png' });
+        const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
+        if (nav.canShare && nav.canShare({ files: [file] }) && navigator.share) {
+          try { await navigator.share({ files: [file], title: 'Hasil pemeriksaan QRIS' }); return; } catch { /* user cancelled */ }
+        }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'hasil-cek-qris.png';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        setStatus('Gambar hasil pemeriksaan terunduh — siap dibagikan.', 'ok');
+      }, 'image/png');
     });
   </script>
 </Layout>

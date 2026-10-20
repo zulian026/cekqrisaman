@@ -76,6 +76,11 @@ describe('assessPayload', () => {
     const r = assessPayload('transfer ke nomor ini ya');
     expect(r.verdict).toBe('BUKAN_QRIS');
   });
+  it('flags a URL shortener as a hidden-destination quishing signal', () => {
+    const r = assessPayload('https://bit.ly/3xYzAbc12');
+    expect(r.verdict).toBe('BUKAN_QRIS');
+    expect(r.signals.map((s) => s.title)).toContain('Tautan pemendek URL');
+  });
   it('flags a structurally broken EMV-looking payload', () => {
     const r = assessPayload('0002010102ZZZZ');
     expect(['BERISIKO_TINGGI', 'BUKAN_QRIS']).toContain(r.verdict);
