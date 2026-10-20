@@ -27,7 +27,7 @@ import Layout from '../layouts/Layout.astro';
           <button id="btn-stop-camera" type="button" class="mt-2.5 w-full rounded-full border border-errbadge/40 bg-errbg px-5 py-3 font-semibold text-errbadge">Berhenti memindai</button>
         </div>
 
-        <div id="dropzone" class="mt-3 rounded-2xl border-2 border-dashed border-darkline bg-dinput px-4 py-5 text-center text-sm text-dsoft transition">
+        <div id="dropzone" class="mt-3 hidden rounded-2xl border-2 border-dashed border-darkline bg-dinput px-4 py-5 text-center text-sm text-dsoft transition sm:block">
           Tarik foto QR ke sini, atau tempel (paste) gambar dari clipboard.
         </div>
 
@@ -77,16 +77,16 @@ import Layout from '../layouts/Layout.astro';
     </aside>
 
     <!-- ============ MAIN: porcelain canvas ============ -->
-    <main class="min-w-0 flex-1 px-5 py-10 sm:px-8 lg:px-14 lg:py-14">
+    <main class="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-14 lg:py-14">
       <div class="max-w-3xl">
         <section>
           <p class="text-xs font-semibold uppercase tracking-[0.25em] text-teald">Pemeriksa QRIS &middot; Gratis &middot; Tanpa server</p>
-          <h1 class="font-display mt-5 text-5xl font-extrabold leading-[0.98] tracking-tight sm:text-6xl xl:text-7xl">
+          <h1 class="font-display mt-5 text-[2.6rem] font-extrabold leading-[1.0] tracking-tight sm:text-6xl xl:text-7xl">
             Cek isi QRIS,<br /><span class="text-teald">sebelum</span> uang<br />berpindah.
           </h1>
           <p class="mt-6 max-w-xl text-base leading-relaxed text-grey sm:text-lg">
             Stiker QRIS palsu ditempel di atas yang asli sedang marak. Baca isi kode itu sendiri —
-            nama penerima, nominal yang terkunci, dan checksum keasliannya — dari panel di samping.
+            nama penerima, nominal yang terkunci, dan checksum keasliannya — dari panel pemeriksaan.
           </p>
         </section>
 
@@ -141,25 +141,25 @@ import Layout from '../layouts/Layout.astro';
           </details>
         </section>
 
-        <section class="mt-16">
+        <section class="mt-12">
           <p class="text-xs font-semibold uppercase tracking-[0.25em] text-teald">Cara kerja</p>
           <div class="mt-2 divide-y divide-linel border-y border-linel">
             <div class="flex gap-6 py-6">
-              <span class="font-display text-5xl font-extrabold leading-none text-teald">01</span>
+              <span class="font-display text-4xl font-extrabold leading-none text-teald sm:text-5xl">01</span>
               <div>
                 <p class="font-display text-2xl font-bold tracking-tight">Scan atau upload</p>
                 <p class="mt-1 text-sm leading-relaxed text-grey">Arahkan kamera ke stiker QRIS, atau upload foto dan tangkapan layarnya.</p>
               </div>
             </div>
             <div class="flex gap-6 py-6">
-              <span class="font-display text-5xl font-extrabold leading-none text-teald">02</span>
+              <span class="font-display text-4xl font-extrabold leading-none text-teald sm:text-5xl">02</span>
               <div>
                 <p class="font-display text-2xl font-bold tracking-tight">Baca nama aslinya</p>
                 <p class="mt-1 text-sm leading-relaxed text-grey">Nama penerima dibaca dari dalam kode, bukan dari logo atau tulisan pada stiker.</p>
               </div>
             </div>
             <div class="flex gap-6 py-6">
-              <span class="font-display text-5xl font-extrabold leading-none text-teald">03</span>
+              <span class="font-display text-4xl font-extrabold leading-none text-teald sm:text-5xl">03</span>
               <div>
                 <p class="font-display text-2xl font-bold tracking-tight">Cocokkan, lalu bayar</p>
                 <p class="mt-1 text-sm leading-relaxed text-grey">Samakan nama dan nominal dengan yang muncul di aplikasi pembayaran Anda. Beda nama, batalkan.</p>
@@ -253,9 +253,9 @@ import Layout from '../layouts/Layout.astro';
     function addRow(dl: HTMLElement, label: string, value?: string) {
       if (!value) return;
       const row = document.createElement('div');
-      row.className = 'flex items-baseline justify-between gap-4 py-2.5';
+      row.className = 'flex flex-col gap-0.5 py-2.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4';
       const dt = document.createElement('dt'); dt.className = 'shrink-0 text-faint'; dt.textContent = label;
-      const dd = document.createElement('dd'); dd.className = 'text-right font-semibold text-ink break-all'; dd.textContent = value;
+      const dd = document.createElement('dd'); dd.className = 'font-semibold text-ink [overflow-wrap:anywhere] sm:text-right'; dd.textContent = value;
       row.append(dt, dd);
       dl.appendChild(row);
     }
@@ -463,11 +463,15 @@ import Layout from '../layouts/Layout.astro';
         for (const diff of cmp.diffs) {
           const li = document.createElement('li');
           const strong = document.createElement('span');
-          strong.className = 'font-semibold';
-          strong.textContent = diff.field + ': ';
-          const val = document.createElement('span');
-          val.textContent = 'referensi "' + (diff.reference ?? '—') + '" ≠ ter-scan "' + (diff.scanned ?? '—') + '"';
-          li.append(strong, val);
+          strong.className = 'block font-semibold';
+          strong.textContent = diff.field;
+          const refLine = document.createElement('span');
+          refLine.className = 'block [overflow-wrap:anywhere]';
+          refLine.textContent = 'Referensi: "' + (diff.reference ?? '—') + '"';
+          const scanLine = document.createElement('span');
+          scanLine.className = 'block [overflow-wrap:anywhere]';
+          scanLine.textContent = 'Ter-scan: "' + (diff.scanned ?? '—') + '"';
+          li.append(strong, refLine, scanLine);
           diffsEl.appendChild(li);
         }
         if (cmp.diffs.length === 0) {

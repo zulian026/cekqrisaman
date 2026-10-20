@@ -45,6 +45,12 @@
 
 html {
   scroll-behavior: smooth;
+  /* This site is light by design — stop Android browsers from force-inverting
+     it in their own dark mode, and stop mobile font boosting from inflating
+     some text runs over their neighbours. */
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 ::selection {
